@@ -1,0 +1,25 @@
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Anna App
+.anna/
+.anna-app/
+dev.key
+
+# Build output
+dist/
+bundle/
+*.exe
+*.test
+*.tar.gz
+*.zip
+
+# Go compiled binaries
+executas/**/bin/
+executas/*/mini-notes-*
+executas/*/*.wasm
+
+# OS
+.DS_Store

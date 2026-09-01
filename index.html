@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mini Notes</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Mini Notes</h1>
+        <button id="summarize" type="button" disabled>Summarize</button>
+      </header>
+      <div id="banner" class="banner" hidden></div>
+      <form id="note-form">
+        <input id="note-input" type="text" placeholder="写一条笔记…" autocomplete="off" disabled />
+        <button id="add-note" type="submit" disabled>保存</button>
+      </form>
+      <ul id="note-list"></ul>
+      <section id="summary-box" hidden>
+        <h2>LLM 总结</h2>
+        <p id="summary-text"></p>
+      </section>
+      <p id="status" role="status"></p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
