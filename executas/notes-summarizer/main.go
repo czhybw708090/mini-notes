@@ -380,7 +380,11 @@ func handleSummarize(notes []string, invokeID string, hub *rpcHub) (string, erro
 	hub.mu.Lock()
 	proto := hub.proto
 	hub.mu.Unlock()
-	if proto != "2.0" {
+	// 本地 harness（anna-app dev）不发 initialize，hub.proto 保持 ""。
+	// 只在 host 显式协商到 v1 时才拒绝采样；""（harness 跳过握手）
+	// 与 "2.0" 都放行，把采样请求发出去让 host 来回答——--no-llm
+	// 下 harness 会用自己的错误拒绝采样（这才是预期行为）。
+	if proto == "1.1" {
 		return "", fmt.Errorf("sampling unavailable: host negotiated protocol %q (sampling requires 2.0)", proto)
 	}
 
