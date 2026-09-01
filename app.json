@@ -1,0 +1,11 @@
+{
+  "slug": "mini-notes",
+  "name": "Mini Notes",
+  "version": "0.1.0",
+  "tagline": "A tiny notes app with one-tap LLM summary.",
+  "description": "Create, view and delete short notes, then summarize them with the host LLM via a bundled Executa tool.",
+  "category": "productivity",
+  "bundled_executas": {
+    "notes-summarizer": { "path": "./executas/notes-summarizer" }
+  }
+}
