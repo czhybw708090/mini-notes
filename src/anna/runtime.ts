@@ -34,6 +34,7 @@ export interface AnnaAppRuntime {
     delete(args: { key: string }, opts?: { timeoutMs?: number }): Promise<unknown>;
   };
   tools: {
+    list(opts?: { timeoutMs?: number }): Promise<unknown>;
     invoke(
       args: { tool_id: string; method?: string; args?: unknown; timeoutMs?: number },
       opts?: { timeoutMs?: number },

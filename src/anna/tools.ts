@@ -11,17 +11,61 @@ import type { SummaryResult } from "../types";
 //   - 发布后：`anna-app apps publish` 铸造真实 id 并写
 //     bundle/anna-tool-ids.js 注入 window.__ANNA_TOOL_IDS__ =
 //     { "notes-summarizer": "<铸造 id>" }，运行时从那里取。
-//   - 本地 dev（实测 anna-app dev）：没有 sidecar；harness 把
-//     required_executas 的 `bundled:<handle>` 原样投影给 iframe ——
-//     tools.list 返回 {"tool_id":"bundled:notes-summarizer"}，
-//     invoke 传 executa.json 的占位 id 会 permission_denied。
-//     所以 dev 回退用 `bundled:<handle>`。executa.json 里的 tool_id
-//     只是 stdio 子进程在 harness 内部的注册键，iframe 层不用它。
+//   - 本地 dev：harness 按根目录 app.json 的 bundled_executas 把
+//     manifest 里的 `bundled:<handle>` 替换成 executa.json 的真实
+//     tool_id（tool-test-…），tools.list 返回的就是这个可 invoke 的
+//     id。写死 bundled: 会因 ExecutaPool 按真实 id 注册而对不上
+//     （not registered → tools.invoke is not available）。
+//   - 兜底：SDK 没有 list（或调用失败）时退回 bundled: 常量，
+//     至少保证老 harness 下 invoke 仍会发出。
 const DEV_FALLBACK_TOOL_ID = "bundled:notes-summarizer";
 
-export function resolveToolId(): string {
+/** tools.list 的条目形状（只声明用到的字段）。 */
+interface ToolListEntry {
+  tool_id: string;
+  status?: string;
+}
+interface ToolListResult {
+  tools: ToolListEntry[];
+}
+
+/**
+ * 运行时解析 notes-summarizer 的可 invoke tool_id：
+ *   a. window.__ANNA_TOOL_IDS__["notes-summarizer"]（发布后 sidecar）；
+ *   b. 否则 tools.list()：优先 tool_id 含 "notes-summarizer" 的条目，
+ *      其次第一个条目；
+ *   c. 都没有（SDK 无 list / list 失败）才回退 DEV_FALLBACK_TOOL_ID。
+ */
+export async function resolveToolId(anna: AnnaAppRuntime): Promise<string> {
   const g = window as unknown as { __ANNA_TOOL_IDS__?: Record<string, string> };
-  return (g.__ANNA_TOOL_IDS__ && g.__ANNA_TOOL_IDS__["notes-summarizer"]) || DEV_FALLBACK_TOOL_ID;
+  const published = g.__ANNA_TOOL_IDS__ && g.__ANNA_TOOL_IDS__["notes-summarizer"];
+  if (published) return published;
+
+  try {
+    const listed = unwrapRpc<unknown>(await anna.tools.list()) as
+      | ToolListResult
+      | ToolListEntry[]
+      | ToolListEntry
+      | null
+      | undefined;
+    // tools.list 在不同 harness 版本返回过数组 / {tools:[…]} / 单对象，
+    // 都归一成条目数组。
+    let entries: ToolListEntry[] = [];
+    if (Array.isArray(listed)) {
+      entries = listed as ToolListEntry[];
+    } else if (listed && Array.isArray((listed as ToolListResult).tools)) {
+      entries = (listed as ToolListResult).tools;
+    } else if (listed) {
+      entries = [listed as ToolListEntry];
+    }
+    const hit =
+      entries.find((t) => t && typeof t.tool_id === "string" && t.tool_id.includes("notes-summarizer")) ??
+      entries.find((t) => t && typeof t.tool_id === "string");
+    if (hit) return hit.tool_id;
+  } catch (err) {
+    console.warn("[mini-notes] tools.list 不可用，回退 bundled tool_id:", err);
+  }
+  return DEV_FALLBACK_TOOL_ID;
 }
 
 // 插件侧 sampling 等待上限 60s（executas/notes-summarizer/main.go），
@@ -40,7 +84,7 @@ export async function summarizeNotes(
 ): Promise<SummaryResult> {
   const resp = unwrapRpc<unknown>(
     await anna.tools.invoke({
-      tool_id: resolveToolId(),
+      tool_id: await resolveToolId(anna),
       method: "summarize",
       args: { notes: contents },
       timeoutMs: INVOKE_TIMEOUT_MS,
