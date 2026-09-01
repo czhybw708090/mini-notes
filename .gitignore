@@ -18,8 +18,13 @@ bundle/
 
 # Go compiled binaries
 executas/**/bin/
+executas/notes-summarizer/notes-summarizer
+executas/notes-summarizer/notes-summarizer.exe
 executas/*/mini-notes-*
 executas/*/*.wasm
+
+# Logs
+*.log
 
 # OS
 .DS_Store
