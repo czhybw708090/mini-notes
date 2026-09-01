@@ -1,0 +1,181 @@
+# 一次性发布三平台二进制 Release assets。
+#
+# 触发：
+#   1) 推送 v* 标签（push tags v*）：版本号 = 标签名去掉 v 前缀
+#   2) 手动触发（workflow_dispatch）：可从任意 ref 发起；建议从 v* 标签
+#      发起，或在输入框填目标 tag（如 v0.2.0）。若两者都没有，则取最近
+#      一个 v* 标签；仍无标签时版本号为 0.0.0+短 sha（仅用于试跑）。
+#
+# 流程：
+#   build   —— matrix 三平台（macos-15 = arm64，macos-15-intel = x86_64，
+#              windows-latest = x86_64），各自在原生 runner 上复用
+#              scripts/build-binary.sh（内部已跑 describe smoke），再显式
+#              跑一次 describe smoke test 复验（Windows 用 PowerShell 语法），
+#              产物存 workflow artifact（仅作中转/调试辅助）。
+#   release —— 等三平台构建完成后，取回产物并用 gh CLI 创建（或更新）
+#              GitHub Release，上传三个 assets（这是正式发布物）。
+#
+# 资产命名（构建脚本保证）：notes-summarizer-<version>-<platform-key>.<ext>
+#   darwin-arm64   → notes-summarizer-0.1.0-darwin-arm64.tar.gz
+#   darwin-x86_64  → notes-summarizer-0.1.0-darwin-x86_64.tar.gz
+#   windows-x86_64 → notes-summarizer-0.1.0-windows-x86_64.zip
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布 tag（v 开头，如 v0.2.0；留空则用最近 v* 标签）'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # gh release 创建/上传需要
+
+jobs:
+  build:
+    name: build ${{ matrix.platform-key }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # 一个平台失败不取消其他平台
+      matrix:
+        include:
+          # GitHub macOS 镜像：macos-15 为 arm64，macos-15-intel 为 x86_64。
+          - platform-key: darwin-arm64
+            os: macos-15
+          - platform-key: darwin-x86_64
+            os: macos-15-intel
+          - platform-key: windows-x86_64
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe 需要完整 tag 历史
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: executas/notes-summarizer/go.mod
+
+      # 版本号提取：git tag / ref。与 release job 同逻辑（各自独立解析）。
+      - name: 解析版本号（git tag / ref）
+        id: version
+        shell: bash # Windows runner 用 Git Bash
+        run: |
+          TAG="${TAG_INPUT:-$GITHUB_REF_NAME}"
+          if [[ "$TAG" == v* ]]; then
+            VERSION="${TAG#v}"
+          else
+            TAG="$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)"
+            if [[ "$TAG" == v* ]]; then
+              VERSION="${TAG#v}"
+            else
+              VERSION="0.0.0-${GITHUB_SHA::7}"
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG version=$VERSION"
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+
+      # 复用构建脚本：交叉编译 + 归档 + 内置 smoke/静态检查。
+      # 脚本按本机平台构建，所以每个 runner 只产自己的平台。
+      - name: 构建 + 归档（build-binary.sh 内置 describe smoke）
+        shell: bash
+        run: VERSION="${{ steps.version.outputs.version }}" bash scripts/build-binary.sh
+
+      # —— 显式 describe smoke test：直接驱动归档内二进制 ——
+      - name: describe smoke（macOS）
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p smoke
+          tar -xzf dist/notes-summarizer-*.tar.gz -C smoke
+          out="$(printf '%s\n%s\n' \
+            '{"jsonrpc":"2.0","method":"initialize","id":0,"params":{"protocolVersion":"2.0"}}' \
+            '{"jsonrpc":"2.0","id":1,"method":"describe"}' | ./smoke/bin/notes-summarizer 2>/dev/null)"
+          grep -q '"name":"notes-summarizer"' <<<"$out" || { echo "FAIL: $out"; exit 1; }
+          grep -q 'host_capabilities' <<<"$out" || { echo "FAIL: $out"; exit 1; }
+          echo "describe smoke OK"
+
+      - name: describe smoke（Windows）
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path (Get-ChildItem dist/*.zip).FullName -DestinationPath smoke
+          $req = '{"jsonrpc":"2.0","method":"initialize","id":0,"params":{"protocolVersion":"2.0"}}' + "`n" +
+                 '{"jsonrpc":"2.0","id":1,"method":"describe"}'
+          $out = $req | & .\smoke\bin\notes-summarizer.exe 2>$null
+          $joined = $out -join "`n"
+          if ($joined -notmatch '"name":"notes-summarizer"' -or $joined -notmatch 'host_capabilities') {
+            Write-Error "describe smoke failed:`n$joined"
+            exit 1
+          }
+          Write-Host "describe smoke OK"
+
+      # artifact 只是中转（调试/暂存），正式发布物是下面的 Release assets。
+      - name: 上传 workflow artifact（辅助，非发布物）
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-summarizer-${{ matrix.platform-key }}
+          path: dist/notes-summarizer-*.*
+          if-no-files-found: error
+
+  release:
+    name: 发布 Release assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 解析版本号（与 build job 同逻辑）
+        id: version
+        run: |
+          TAG="${TAG_INPUT:-$GITHUB_REF_NAME}"
+          if [[ "$TAG" == v* ]]; then
+            VERSION="${TAG#v}"
+          else
+            TAG="$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)"
+            if [[ "$TAG" == v* ]]; then
+              VERSION="${TAG#v}"
+            else
+              VERSION="0.0.0-${GITHUB_SHA::7}"
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG version=$VERSION"
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+
+      - name: 取回三平台产物
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist/
+
+      - name: 上传 Release assets（gh CLI）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if [ -z "$TAG" ]; then
+            # 兜底场景（无任何 v* 标签，如从裸分支试跑）：产物已在
+            # workflow artifacts 里，跳过发布。
+            echo "::warning::no v* tag found; skipping release upload (builds are in artifacts)"
+            exit 0
+          fi
+          ls -l dist/
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Release 已存在（如手动重复触发）：覆盖同名 assets。
+            gh release upload "$TAG" dist/notes-summarizer-* --clobber
+          else
+            gh release create "$TAG" dist/notes-summarizer-* \
+              --generate-notes --title "$TAG"
+          fi

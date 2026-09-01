@@ -1,0 +1,1 @@
+{"ns":"sampling","method":"createMessage","match":{"contentIncludes":"Workshop 内容想法"},"result":{"role":"assistant","content":{"type":"text","text":"FIXTURE-SUMMARY：客户跟进、登录修复与 Workshop 准备三点均已提炼为待办（来自 --mock-sampling fixture 回放，非本地拼接）。"},"model":"mock-model","stopReason":"endTurn"}}
