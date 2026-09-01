@@ -1,0 +1,6 @@
+{
+  "tool_id": "tool-test-notes-summarizer-00000001",
+  "type": "go",
+  "enabled": true,
+  "_comment": "Registration key for the local stdio subprocess inside `anna-app dev` (harness log: 'executas tool-test-notes-summarizer-00000001'). The iframe does NOT use this id: in dev the harness projects required_executas' 'bundled:notes-summarizer' as the iframe-visible tool_id (verified via tools.list + invoke ACL), which is the fallback in src/anna/tools.ts. At publish time `anna-app apps publish` mints the real id and writes bundle/anna-tool-ids.js, resolved at runtime via window.__ANNA_TOOL_IDS__[\"notes-summarizer\"]."
+}
