@@ -97,17 +97,19 @@ node scripts/ui-e2e.mjs
 
 ### 为什么 --no-llm 下 Summarize 预期失败
 
-`--no-llm` 禁用了 harness 的 llm bridge；同时当前 uvx 运行时
-（`anna-app-runtime-local@0.2.0a21`）的 app 级 `tools.invoke` 返回
-`not_implemented`（ACL 校验照常执行）。所以 Summarize 点击后 UI 显示：
+`--no-llm` 禁用了 harness 的 llm bridge，executa 发出的
+sampling/createMessage 反向 RPC 会被 harness 拒绝。所以 Summarize
+点击后 UI 显示：
 
 ```
-总结失败：tools.invoke is not available in this runtime
+总结失败：sampling failed (-32603 harness started with --no-llm)
 ```
 
-这是 **App 调试路径的预期行为**：前端正确走到了 `anna.tools.invoke`，
-失败被优雅展示而不是白屏。它不代表后端 sampling 链路有问题——后端
-链路独立于 UI 验证，见下节。
+链路已经完整走通：tools.invoke → executa → sampling 请求发出 →
+ACL 放行（manifest 声明了 `ui.host_api.llm`）→ harness 因 --no-llm
+主动拒绝（-32603）。这是 **App 调试路径的预期行为**（等价于题目的
+[-32603]），不代表后端 sampling 链路有问题——后端链路独立于 UI
+验证，见下节。
 
 ## 单独测后端 sampling 链路
 
@@ -168,7 +170,8 @@ python3 e2e_mock_host.py           # python 版，自建 mock host + 失败路�
 
 ```
 Summarize 按钮
-  → anna.tools.invoke {tool_id:"bundled:notes-summarizer", method:"summarize", args:{notes}}
+  → resolveToolId()（tools.list() / __ANNA_TOOL_IDS__ 解析真实 tool_id）
+  → anna.tools.invoke {tool_id, method:"summarize", args:{notes}}
     → harness 把 invoke 转发给 executa 子进程（stdio JSON-RPC）
       → executa 发反向 RPC sampling/createMessage（经 stdout）
         → host LLM 生成总结 → 响应回 executa
@@ -178,8 +181,9 @@ Summarize 按钮
 
 证据读取方式：
 
-- 前端：ui-e2e.mjs 拦截到 `ns=tools method=invoke`，args 含
-  `tool_id=bundled:notes-summarizer` 与重读后的 notes。
+- 前端：ui-e2e.mjs 拦截到 `ns=tools method=invoke`，args 的
+  tool_id 为运行时解析结果（dev 下是 executa.json 的真实 id）与
+  重读后的 notes。
 - 后端：executa stderr 的 `[sampling] request sent id=sr-1`；
   fixture 的 contentIncludes 子串命中 = 请求携带了笔记内容；
   返回的 summary 文本来自 fixture（mock 回放），非前端本地拼接。
@@ -216,7 +220,7 @@ notes-summarizer-<ver>-windows-x86_64.zip
 
 ## 已知限制
 
-当前 uvx 运行时（`anna-app-runtime-local@0.2.0a21`）的 app 级
-`tools.invoke` 返回 `not_implemented`，iframe → tools.invoke 的端到端
-链路待运行时升级；插件协议链路已由 `test-executa.sh` / `e2e_mock_host.py`
+本地 UI harness 里 sampling 反向 RPC 会被 `--no-llm` 拒绝（见上），
+完整 summary 需接真实 LLM，或用 `--mock-sampling` 单独验证后端。
+插件协议链路已由 `test-executa.sh` / `e2e_mock_host.py`
 （自建 host 模拟）与 `anna-app executa dev`（真实 harness）两条路径验证。

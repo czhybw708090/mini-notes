@@ -14,8 +14,7 @@ import type { SummaryResult } from "../types";
 //   - 本地 dev：harness 按根目录 app.json 的 bundled_executas 把
 //     manifest 里的 `bundled:<handle>` 替换成 executa.json 的真实
 //     tool_id（tool-test-…），tools.list 返回的就是这个可 invoke 的
-//     id。写死 bundled: 会因 ExecutaPool 按真实 id 注册而对不上
-//     （not registered → tools.invoke is not available）。
+//     id。写死 bundled: 会与 ExecutaPool 按真实 id 注册的条目对不上。
 //   - 兜底：SDK 没有 list（或调用失败）时退回 bundled: 常量，
 //     至少保证老 harness 下 invoke 仍会发出。
 const DEV_FALLBACK_TOOL_ID = "bundled:notes-summarizer";

@@ -1,1 +1,1 @@
-{"ns":"sampling","method":"createMessage","match":{"contentIncludes":"1. 测试"},"result":{"role":"assistant","content":{"type":"text","text":"FIXTURE-SUMMARY：以上笔记要点已提炼（来自 --mock-sampling fixture 回放，非本地拼接）。"},"model":"mock-model","stopReason":"endTurn"}}
+{"ns":"sampling","method":"createMessage","match":{"contentIncludes":"请总结以下笔记"},"result":{"role":"assistant","content":{"type":"text","text":"FIXTURE-SUMMARY：以上笔记要点已提炼（来自 --mock-sampling fixture 回放，非本地拼接）。"},"model":"mock-model","stopReason":"endTurn"}}

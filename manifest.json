@@ -12,6 +12,7 @@
     }
   ],
   "optional_executas": [],
+  "host_capabilities": ["llm.sample"],
   "ui": {
     "bundle": {
       "format": "static-spa",
@@ -34,7 +35,8 @@
     ],
     "host_api": {
       "tools": ["required:bundled:notes-summarizer"],
-      "storage": ["get", "set", "delete"]
+      "storage": ["get", "set", "delete"],
+      "llm": ["complete"]
     },
     "state_merge": "last_writer_wins"
   },
