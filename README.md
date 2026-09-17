@@ -218,6 +218,27 @@ notes-summarizer-<ver>-darwin-x86_64.tar.gz
 notes-summarizer-<ver>-windows-x86_64.zip
 ```
 
+### 关于 VS Code 的 "Unable to resolve action" 提示
+
+编辑器里 release.yml 的 5 处 `uses:` 行可能被 VS Code GitHub Actions
+扩展（github.vscode-github-actions）标 "Unable to resolve action"。
+这是**伪报错**：本 workflow 只引用 `actions/checkout@v4`（×2）、
+`actions/setup-go@v5`、`actions/upload-artifact@v4`、
+`actions/download-artifact@v4` 四个官方一方 action，拼写与版本均正确
+（文件无 BOM、无 CRLF、无隐藏字符）。报错来自扩展内置语言服务器在
+本地联网解析 uses 目标失败（网络受限时 fetch action.yml 失败即标
+Error 诊断），不影响 workflow 在真实 GitHub Actions 上运行——push 后
+即按原样执行。
+
+该扩展没有「关闭远程解析/校验」的设置项（其全部 settings 只有
+`workflows.pinned.*` 三项、`remote-name`、`use-enterprise`），无法通过
+settings.json 关掉此提示。消除编辑器警告的办法是禁用该扩展本身：
+
+```
+code --disable-extension github.vscode-github-actions
+# 或在 VS Code 扩展面板里禁用 GitHub Actions
+```
+
 ## 已知限制
 
 本地 UI harness 里 sampling 反向 RPC 会被 `--no-llm` 拒绝（见上），
