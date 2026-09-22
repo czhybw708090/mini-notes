@@ -21,6 +21,9 @@ dist/notes-summarizer-<ver>-<platform>.*  ← scripts/build-binary.sh 产出，
 
 - **manifest**：声明 UI 视图、host_api 权限（storage/tools）、`required_executas`
   （`bundled:notes-summarizer`）。schema 2，`anna-app validate --strict` 校验。
+- `ui.host_api.storage` 保留完整的 `get` / `set` / `delete` 声明；应用实际只用
+  `get` / `set`，因为删除按单 key 设计实现为 get → 改 → set，不调用
+  `storage.delete`。
 - **bundle**：前端静态 SPA（相对路径，无框架，原生 DOM），连接 host SDK
   （`/static/anna-apps/_sdk/...`）后拿到 `anna.storage` / `anna.tools`。
 - **executas**：本地工具子进程，host 按 manifest 的 required_executas 拉起，
@@ -73,6 +76,8 @@ npm install
 npm run build      # 产物在 bundle/，base 相对路径
 ```
 
+一键自检：`./scripts/selfcheck.sh`。
+
 ## 校验 manifest
 
 ```bash
@@ -124,12 +129,13 @@ fixture 格式（JSONL，每行一条 mock 规则）：
 
 ```json
 {"ns":"sampling","method":"createMessage",
- "match":{"contentIncludes":"<prompt 子串>"},
+ "match":{"contentIncludes":"请总结以下笔记"},
  "result":{...sampling 响应（role/content/model/stopReason）...}}
 ```
 
-`contentIncludes` 命中说明 sampling 请求携带了笔记内容；tool 侧 stderr
-会打印 `[sampling] request sent id=sr-1`，即反向 RPC 已发出的证据。
+`contentIncludes` 命中固定的 prompt 前缀「请总结以下笔记」，说明 sampling 请求
+携带了笔记内容；它不依赖某一条具体笔记文本。tool 侧 stderr 会打印
+`[sampling] request sent id=sr-1`，即反向 RPC 已发出的证据。
 
 ## 手动测 Executa JSON-RPC
 
@@ -245,3 +251,29 @@ code --disable-extension github.vscode-github-actions
 完整 summary 需接真实 LLM，或用 `--mock-sampling` 单独验证后端。
 插件协议链路已由 `test-executa.sh` / `e2e_mock_host.py`
 （自建 host 模拟）与 `anna-app executa dev`（真实 harness）两条路径验证。
+
+## FAQ
+
+### 为什么 `--no-llm` 下点击 Summarize 会报 -32603？
+
+这是预期行为，不是 bug。`--no-llm` 只启动 UI harness，不提供 LLM bridge；
+UI 到 tools.invoke、Executa 到 sampling 请求的链路仍会运行，但 sampling 会被
+harness 以 `-32603` 拒绝。需要验证真实 summary 时，应连接可用的 LLM，或使用
+`--mock-sampling` 验证后端采样链路。
+
+### 为什么工具身份要在四处保持一致？`app.json` 做什么？
+
+四处分别是：`manifest.json` 的 `required_executas` 声明依赖
+`bundled:notes-summarizer`；`manifest.json` 的 `ui.host_api.tools` 授权
+`required:bundled:notes-summarizer`；前端 `src/anna/tools.ts` 通过发布时注入的
+`window.__ANNA_TOOL_IDS__` 或运行时 `tools.list()` 解析可调用的真实 `tool_id`；
+Executa `describe` 返回的工具名是 `notes-summarizer`。根目录 `app.json` 只负责
+本地 dev harness 把这个 handle 映射到 `./executas/notes-summarizer` 并注册子进程，
+不会替代 manifest 的声明、host API 授权或前端运行时解析。
+
+### `--no-llm` 和 `--mock-sampling` 有什么区别？
+
+`--no-llm` 用于 UI harness 调试，重点验证 iframe、storage、tools.invoke 和
+失败展示；它预期不返回 LLM 总结。`--mock-sampling` 用于后端 Executa 验证，
+用 `fixtures/sampling-mock.jsonl` 回放 sampling 响应，检查 prompt、反向 RPC 和
+fixture summary，不需要真实 LLM，也不替代 UI harness 测试。
