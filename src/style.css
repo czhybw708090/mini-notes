@@ -103,9 +103,22 @@ button:disabled {
   border-radius: 8px;
 }
 
+#note-list li > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 #note-list li span {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+#note-list li .note-time {
+  color: #8a8a85;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 #note-list li.empty {

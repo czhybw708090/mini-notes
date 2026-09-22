@@ -15,6 +15,13 @@ export interface NoteHandlers {
   onSummarize(): void;
 }
 
+function formatCreatedAt(createdAt: string): string {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return createdAt;
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /** 重绘笔记列表；按数组顺序（即添加顺序）渲染。 */
 export function renderNotes(notes: Note[], onDelete: (id: string) => void): void {
   const list = $<HTMLUListElement>("note-list");
@@ -28,13 +35,20 @@ export function renderNotes(notes: Note[], onDelete: (id: string) => void): void
   }
   for (const note of notes) {
     const li = document.createElement("li");
+    const details = document.createElement("div");
     const text = document.createElement("span");
+    text.className = "note-content";
     text.textContent = note.content; // textContent：笔记内容不当作 HTML
+    const timestamp = document.createElement("time");
+    timestamp.className = "note-time";
+    timestamp.dateTime = note.createdAt;
+    timestamp.textContent = formatCreatedAt(note.createdAt); // textContent：时间不当作 HTML
+    details.append(text, timestamp);
     const del = document.createElement("button");
     del.type = "button";
     del.textContent = "删除";
     del.addEventListener("click", () => onDelete(note.id));
-    li.append(text, del);
+    li.append(details, del);
     list.appendChild(li);
   }
 }
