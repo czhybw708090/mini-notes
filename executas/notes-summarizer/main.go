@@ -438,14 +438,14 @@ func handleSummarize(notes []string, invokeID string, hub *rpcHub) (string, erro
 
 func formatSamplingError(err *rpcError) string {
 	readable := map[int]string{
-		-32008: "sampling 未协商（缺 v2/host_capabilities）",
+		-32008: "sampling 未协商",
 		-32001: "用户未授权 sampling",
 		-32002: "配额超限",
 		-32004: "请求参数非法",
 		-32005: "sampling 超时",
 	}
 	if message, ok := readable[err.Code]; ok {
-		return fmt.Sprintf("sampling failed (%d %s)", err.Code, message)
+		return fmt.Sprintf("sampling failed (%d %s: %s)", err.Code, message, err.Message)
 	}
 	return fmt.Sprintf("sampling failed (%d %s)", err.Code, err.Message)
 }
