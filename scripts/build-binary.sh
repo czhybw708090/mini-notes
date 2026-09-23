@@ -167,8 +167,25 @@ JSON
   if [ "$ext" = "tar.gz" ]; then
     tar -czf "$out" -C "$stage" bin manifest.json
   else
-    (cd "$stage" && zip -qr "$out" bin manifest.json)
+    if command -v zip >/dev/null 2>&1; then
+      (cd "$stage" && zip -qr "$out" bin manifest.json)
+    elif command -v powershell.exe >/dev/null 2>&1; then
+      stage_win="$(cygpath -w "$stage")"
+      out_win="$(cygpath -w "$out")"
+      ANNA_STAGE_WIN="$stage_win" ANNA_OUT_WIN="$out_win" \
+        powershell.exe -NoProfile -NonInteractive -Command '
+          $stage = $env:ANNA_STAGE_WIN
+          $out = $env:ANNA_OUT_WIN
+          Push-Location $stage
+          try { Compress-Archive -Path bin, manifest.json -DestinationPath $out -Force }
+          finally { Pop-Location }
+        '
+    else
+      echo "FAIL: zip or powershell.exe is required to create $out" >&2
+      return 1
+    fi
   fi
+  [ -f "$out" ] || { echo "FAIL: archive was not created: $out" >&2; return 1; }
 
   # 4. 验收检查（smoke test / 跨平台静态检查）。
   check_artifact "$stage/bin/$bin" || return 1
