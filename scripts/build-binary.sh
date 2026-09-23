@@ -167,7 +167,21 @@ JSON
   if [ "$ext" = "tar.gz" ]; then
     tar -czf "$out" -C "$stage" bin manifest.json
   else
-    if command -v zip >/dev/null 2>&1; then
+    if command -v python3 >/dev/null 2>&1; then
+      python3 - "$stage" "$out" <<'PY'
+import os
+import sys
+import zipfile
+
+stage, out = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+    archive.write(os.path.join(stage, "manifest.json"), "manifest.json")
+    archive.write(
+        os.path.join(stage, "bin", "notes-summarizer.exe"),
+        "bin/notes-summarizer.exe",
+    )
+PY
+    elif command -v zip >/dev/null 2>&1; then
       (cd "$stage" && zip -qr "$out" bin manifest.json)
     elif command -v powershell.exe >/dev/null 2>&1; then
       stage_win="$(cygpath -w "$stage")"
@@ -181,7 +195,7 @@ JSON
           finally { Pop-Location }
         '
     else
-      echo "FAIL: zip or powershell.exe is required to create $out" >&2
+      echo "FAIL: python3, zip, or powershell.exe is required to create $out" >&2
       return 1
     fi
   fi
