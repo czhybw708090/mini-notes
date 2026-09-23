@@ -136,7 +136,7 @@ build_one() {
   (
     cd "$TOOL_DIR"
     CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-      go build -trimpath -ldflags "-s -w" -o "$stage/bin/$bin" .
+      go build -trimpath -ldflags "-s -w -X main.ToolVersion=${VERSION}" -o "$stage/bin/$bin" .
   )
 
   # 2. 归档根 manifest.json（entrypoint 按平台区分 .exe；permissions

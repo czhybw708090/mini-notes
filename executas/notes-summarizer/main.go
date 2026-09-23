@@ -33,8 +33,7 @@ import (
 )
 
 const (
-	ToolName    = "notes-summarizer"
-	ToolVersion = "0.1.0"
+	ToolName = "notes-summarizer"
 
 	// Scanner limits: initial 64 KiB, max 16 MiB per line (protocol
 	// ceiling is 2 MiB, file transport beyond ~512 KiB).
@@ -47,6 +46,9 @@ const (
 	// maxTokens for the summarization completion (host cap is 8192).
 	samplingMaxTokens = 512
 )
+
+// ToolVersion is overridden by release builds with the git tag version.
+var ToolVersion = "0.1.0"
 
 // ---- describe manifest (exported so packaging scripts and tests can reuse it) ----
 
