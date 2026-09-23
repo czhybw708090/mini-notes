@@ -199,7 +199,7 @@ Summarize 按钮
 ```bash
 ./scripts/build-binary.sh          # 本机平台 → dist/
 ./scripts/build-binary.sh all      # 三平台全量（CI 用）
-VERSION=0.2.0 ./scripts/build-binary.sh   # 覆盖版本（默认 0.1.0）
+VERSION=0.2.0 ./scripts/build-binary.sh   # 覆盖版本（默认 0.1.0；同时写入归档名和 describe）
 ```
 
 产出 `notes-summarizer-<version>-<platform-key>.<ext>`：

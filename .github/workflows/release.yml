@@ -16,9 +16,9 @@
 #              GitHub Release，上传三个 assets（这是正式发布物）。
 #
 # 资产命名（构建脚本保证）：notes-summarizer-<version>-<platform-key>.<ext>
-#   darwin-arm64   → notes-summarizer-0.1.0-darwin-arm64.tar.gz
-#   darwin-x86_64  → notes-summarizer-0.1.0-darwin-x86_64.tar.gz
-#   windows-x86_64 → notes-summarizer-0.1.0-windows-x86_64.zip
+#   darwin-arm64   → notes-summarizer-<version>-darwin-arm64.tar.gz
+#   darwin-x86_64  → notes-summarizer-<version>-darwin-x86_64.tar.gz
+#   windows-x86_64 → notes-summarizer-<version>-windows-x86_64.zip
 
 name: release
 
